@@ -33,3 +33,49 @@ check_object_lock_config() {
   fi
   return 0
 }
+
+check_no_object_lock_config_rest() {
+  if ! check_param_count "check_no_object_lock_config_rest" "bucket" 1 $#; then
+    return 1
+  fi
+  if get_object_lock_configuration_rest "$1"; then
+    log 2 "object lock config should be missing"
+    return 1
+  fi
+  log 5 "object lock config: $(cat "$TEST_FILE_FOLDER/object-lock-config.txt")"
+  # shellcheck disable=SC2154
+  if [[ "$result" != "404" ]]; then
+    log 2 "incorrect response code: $reply"
+    return 1
+  fi
+  if ! error=$(xmllint --xpath '//*[local-name()="Code"]/text()' "$TEST_FILE_FOLDER/object-lock-config.txt" 2>&1); then
+    log 2 "error getting object lock config error: $error"
+    return 1
+  fi
+  if [[ "$error" != "ObjectLockConfigurationNotFoundError" ]]; then
+    log 2 "unexpected error: $error"
+    return 1
+  fi
+  return 0
+}
+
+check_object_lock_config_enabled_rest() {
+  if ! check_param_count "check_object_lock_config_enabled_rest" "bucket" 1 $#; then
+    return 1
+  fi
+  if ! get_object_lock_configuration_rest "$1"; then
+    log 2 "error getting object lock config"
+    return 1
+  fi
+  log 5 "object lock config: $(cat "$TEST_FILE_FOLDER/object-lock-config.txt")"
+  if ! enabled=$(xmllint --xpath '//*[local-name()="ObjectLockEnabled"]/text()' "$TEST_FILE_FOLDER/object-lock-config.txt" 2>&1); then
+    log 2 "error getting object lock config enabled value: $enabled"
+    return 1
+  fi
+  if [[ "$enabled" != "Enabled" ]]; then
+    log 2 "expected 'Enabled', is $enabled"
+    return 1
+  fi
+  return 0
+}
+

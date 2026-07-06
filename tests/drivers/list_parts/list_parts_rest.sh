@@ -129,3 +129,76 @@ upload_check_part() {
   echo "$payload_part"
   return 0
 }
+
+check_list_with_marker_and_max_parts() {
+  if ! check_param_count_gt "data file, bucket, key, upload ID, max parts, part number marker, expected next part number marker, etag/size pairs" 7 $#; then
+    return 1
+  fi
+  local response list_parts_result part_count part_number_marker="$6" next_part_number_marker="$7" parts=()
+
+  if ! response=$(get_element "$1" "ListPartsResult" 2>&1); then
+    log 2 "error getting response: $response"
+    return 1
+  fi
+  list_parts_result="$response"
+  shift
+
+  local xml_array=("Bucket" "Key" "UploadId" "MaxParts" "PartNumberMarker" "NextPartNumberMarker")
+  for xml_name in "${xml_array[@]}"; do
+    if ! response=$(check_xml_element_inside_string "$list_parts_result" "$1" "$xml_name" 2>&1); then
+      log 2 "error checking element with name '$xml_name': $response"
+      return 1
+    fi
+    shift
+  done
+
+  if ! response=$(get_elements_inside_string "$list_parts_result" "Part" 2>&1); then
+    log 2 "error getting Part elements: $response"
+    return 1
+  fi
+  log 5 "parts: $response"
+  if [ "$response" != "" ]; then
+    mapfile -t parts <<< "$response"
+  fi
+
+  local part_count=$((next_part_number_marker-part_number_marker))
+  if [ $part_count -lt 0 ]; then
+    part_count=0
+  fi
+  if [ ${#parts[@]} -ne "$part_count" ]; then
+    log 2 "part count mismatch, expected '$part_count, actual '${#parts[@]}'"
+    return 1
+  fi
+  if [ $((part_count*2)) -ne "$#" ]; then
+    log 2 "part count and etag/size mismatch, expected $((part_count*2)) fields, actual is $#"
+    return 1
+  fi
+  for ((i=0; i<part_count; i++)); do
+    local part_number=$((part_number_marker+1+i))
+    if ! response=$(check_xml_element_inside_string "${parts[$i]}" "$part_number" "PartNumber" 2>&1); then
+      log 2 "error checking PartNumber: $response"
+      return 1
+    fi
+    if ! response=$(check_xml_element_inside_string "${parts[$i]}" "$1" "ETag" 2>&1); then
+      log 2 "error checking ETag for part $((i+1)) in array: $response"
+      return 1
+    fi
+    if ! response=$(check_xml_element_inside_string "${parts[$i]}" "$2" "Size" 2>&1); then
+      log 2 "error checking Size for part $((i+1)) in array: $response"
+      return 1
+    fi
+    shift 2
+  done
+  return 0
+}
+
+list_parts_check_with_marker_and_max_parts() {
+  if ! check_param_count_gt "bucket name, key, upload ID, max parts, part number marker, expected next part number marker, etag/size pairs" 6 $#; then
+    return 1
+  fi
+  if ! send_rest_go_command_callback "200" "check_list_with_marker_and_max_parts" "-bucketName" "$1" "-objectKey" "$2" "-query" "part-number-marker=$5&max-parts=$4&uploadId=$3" "--" "$@"; then
+    log 2 "error sending ListParts command and checking callback"
+    return 1
+  fi
+  return 0
+}
