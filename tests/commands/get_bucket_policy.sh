@@ -166,7 +166,7 @@ get_bucket_policy_rest_expect_code() {
   fi
   file_name="$response"
 
-  if ! response=$(COMMAND_LOG="$COMMAND_LOG" BUCKET_NAME="$bucket_name" OUTPUT_FILE="$TEST_FILE_FOLDER/$file_name" "$region_string" ./tests/rest_scripts/get_bucket_policy.sh 2>&1); then
+  if ! response=$(env COMMAND_LOG="$COMMAND_LOG" BUCKET_NAME="$bucket_name" OUTPUT_FILE="$TEST_FILE_FOLDER/$file_name" "$region_string" ./tests/rest_scripts/get_bucket_policy.sh 2>&1); then
     log 2 "error attempting to get bucket policy response: $response"
     return 1
   fi
