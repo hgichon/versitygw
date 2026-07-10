@@ -112,6 +112,11 @@ get_bucket_policy_s3cmd() {
 }
 
 parse_s3cmd_policy() {
+  if ! check_param_count_v2 "response data" 1 $#; then
+    return 1
+  fi
+
+  local response_data="$1"
   local line policy=""
 
   while IFS= read -r line; do
@@ -122,12 +127,16 @@ parse_s3cmd_policy() {
       policy+=$'\n'"$line"
     fi
 
-    if jq -e . >/dev/null 2>&1 <<<"$policy"; then
+    if [ "$policy" == "none" ]; then
+      echo ""
+      return 0
+    elif jq -e . >/dev/null 2>&1 <<<"$policy"; then
       printf '%s\n' "$policy"
       return 0
     fi
-  done
+  done <<< "$response_data"
 
+  log 2 "policy data not found (data: '$response_data')"
   return 1
 }
 
