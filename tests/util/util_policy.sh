@@ -190,14 +190,18 @@ get_and_check_policy() {
   if ! check_param_count "get_and_check_policy" "client, bucket, expected effect, principal, action, resource" 6 $#; then
     return 1
   fi
-  if ! get_bucket_policy "$1" "$2"; then
-    log 2 "error getting bucket policy after setting"
+  local client="$1" bucket="$2" expected_effect="$3" expected_principal="$4" expected_action="$5" expected_resource="$6"
+  local response policy
+
+  if ! response=$(get_bucket_policy "$client" "$bucket" 2>&1); then
+    log 2 "error getting bucket policy after setting: $response"
     return 1
   fi
+  policy="$response"
 
   # shellcheck disable=SC2154
-  log 5 "POLICY:  $bucket_policy"
-  if ! check_policy "$bucket_policy" "$3" "$4" "$5" "$6"; then
+  log 5 "POLICY:  $policy"
+  if ! check_policy "$policy" "$expected_effect" "$expected_principal" "$expected_action" "$expected_resource"; then
     log 2 "error checking policy"
     return 1
   fi
